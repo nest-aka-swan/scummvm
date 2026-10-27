@@ -354,6 +354,7 @@ struct LingoState {
 	Datum me;								// current me object
 	StackData stack;
 	int currentChannelId = 0;
+	MovieReference playReturn;				// where "play done" returned to, reused by further "play" calls
 
 	~LingoState();
 };

@@ -179,6 +179,10 @@ void Lingo::func_play(Datum &frame, Datum &movie) {
 
 		stage->_movieStack.pop_back();
 
+		// The handler that called "play" resumes before this goto takes effect
+		if (stage->getLingoPlayState())
+			stage->getLingoPlayState()->playReturn = ref;
+
 		Datum m, f;
 
 		if (ref.movie.empty()) {
@@ -201,14 +205,21 @@ void Lingo::func_play(Datum &frame, Datum &movie) {
 		return;
 	}
 
-	if (movie.type != VOID) {
-		ref.movie = _vm->getCurrentMovie()->_movieArchive->getPathName().toString(g_director->_dirSeparator);
+	if (_state->playReturn.frameI != -1) {
+		// This handler was resumed by "play done". Like D5, count from the
+		// frame "play done" returns to, not from the frame it ran in.
+		ref = _state->playReturn;
+	} else {
+		ref.frameI = _vm->getCurrentMovie()->getScore()->getCurrentFrameNum();
 	}
-	ref.frameI = _vm->getCurrentMovie()->getScore()->getCurrentFrameNum();
 
 	// if we are issuing play command from script channel script. then play done should return to next frame
 	if (_state->currentChannelId == 0)
 		ref.frameI++;
+
+	if (movie.type != VOID && ref.movie.empty()) {
+		ref.movie = _vm->getCurrentMovie()->_movieArchive->getPathName().toString(g_director->_dirSeparator);
+	}
 
 	stage->_movieStack.push_back(ref);
 

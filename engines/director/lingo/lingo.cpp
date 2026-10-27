@@ -745,6 +745,9 @@ bool Lingo::execute(int targetFrame) {
 			popContext(true);
 		}
 	}
+	// A finished state can be reused for the next handler
+	if (_state->callstack.empty())
+		_state->playReturn = MovieReference();
 	_abort = false;
 	_freezeState = false;
 	_freezePlay = false;

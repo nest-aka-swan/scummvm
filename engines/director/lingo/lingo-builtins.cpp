@@ -2051,6 +2051,8 @@ void LB::b_go(int nargs) {
 				warning("b_go: frame arg should be of type STRING or INT, not %s", frame.type2str());
 			}
 
+			// "go" replaces the return point of an earlier "play done"
+			g_lingo->_state->playReturn = MovieReference();
 			g_lingo->func_goto(frame, movie, true);
 		}
 
