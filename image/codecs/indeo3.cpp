@@ -270,22 +270,26 @@ const Graphics::Surface *Indeo3Decoder::decodeFrame(Common::SeekableReadStream &
 	const byte *srcU = _cur_frame->Ubuf;
 	const byte *srcV = _cur_frame->Vbuf;
 
-	// Create buffers for U/V with an extra row/column copied from the second-to-last
-	// row/column.
-	byte *tempU = new byte[(chromaWidth + 1) * (chromaHeight + 1)];
-	byte *tempV = new byte[(chromaWidth + 1) * (chromaHeight + 1)];
+	// The chroma planes are padded to a multiple of 4, but only a quarter of the
+	// frame size belongs to the picture. Create buffers for U/V with an extra
+	// row/column copied from the last visible row/column, so the interpolation
+	// doesn't blend in the padding.
+	uint32 uvWidth  = (fWidth  + 3) >> 2;
+	uint32 uvHeight = (fHeight + 3) >> 2;
+	byte *tempU = new byte[(uvWidth + 1) * (uvHeight + 1)];
+	byte *tempV = new byte[(uvWidth + 1) * (uvHeight + 1)];
 
-	for (uint i = 0; i < chromaHeight; i++) {
-		memcpy(tempU + (chromaWidth + 1) * i, srcU + chromaWidth * i, chromaWidth);
-		memcpy(tempV + (chromaWidth + 1) * i, srcV + chromaWidth * i, chromaWidth);
-		tempU[(chromaWidth + 1) * i + chromaWidth] = srcU[chromaWidth * (i + 1) - 1];
-		tempV[(chromaWidth + 1) * i + chromaWidth] = srcV[chromaWidth * (i + 1) - 1];
+	for (uint i = 0; i < uvHeight; i++) {
+		memcpy(tempU + (uvWidth + 1) * i, srcU + chromaWidth * i, uvWidth);
+		memcpy(tempV + (uvWidth + 1) * i, srcV + chromaWidth * i, uvWidth);
+		tempU[(uvWidth + 1) * i + uvWidth] = srcU[chromaWidth * i + uvWidth - 1];
+		tempV[(uvWidth + 1) * i + uvWidth] = srcV[chromaWidth * i + uvWidth - 1];
 	}
 
-	memcpy(tempU + (chromaWidth + 1) * chromaHeight, tempU + (chromaWidth + 1) * (chromaHeight - 1),
-			chromaWidth + 1);
-	memcpy(tempV + (chromaWidth + 1) * chromaHeight, tempV + (chromaWidth + 1) * (chromaHeight - 1),
-			chromaWidth + 1);
+	memcpy(tempU + (uvWidth + 1) * uvHeight, tempU + (uvWidth + 1) * (uvHeight - 1),
+			uvWidth + 1);
+	memcpy(tempV + (uvWidth + 1) * uvHeight, tempV + (uvWidth + 1) * (uvHeight - 1),
+			uvWidth + 1);
 
 	// Blit the frame onto the surface
 	uint32 scaleWidth  = MAX<uint32>(_surface->w / fWidth, 1);
@@ -294,14 +298,14 @@ const Graphics::Surface *Indeo3Decoder::decodeFrame(Common::SeekableReadStream &
 	if (scaleWidth == 1 && scaleHeight == 1 && fWidth <= _surface->w && fHeight <= _surface->h) {
 		// Shortcut: Don't need to scale so we can decode straight to the surface
 		YUVToRGBMan.convert410(_surface, Graphics::YUVToRGBManager::kScaleITU, srcY, tempU, tempV,
-				fWidth, fHeight, fWidth, chromaWidth + 1);
+				fWidth, fHeight, fWidth, uvWidth + 1);
 	} else {
 		// Need to upscale or crop, so decode to a temp surface first
 		Graphics::Surface tempSurface;
 		tempSurface.create(fWidth, fHeight, _surface->format);
 
 		YUVToRGBMan.convert410(&tempSurface, Graphics::YUVToRGBManager::kScaleITU, srcY, tempU, tempV,
-				fWidth, fHeight, fWidth, chromaWidth + 1);
+				fWidth, fHeight, fWidth, uvWidth + 1);
 
 		// Upscale or crop
 		for (int y = 0; y < _surface->h; y++) {
